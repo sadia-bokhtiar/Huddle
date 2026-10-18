@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'home_screen.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,8 +24,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _signIn() {
     if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Signing in as ${_emailController.text}')),
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(
+            name: _emailController.text.split('@').first,
+          ),
+        ),
       );
     }
   }
@@ -116,7 +122,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const SignUpScreen(),
+                          ),
+                        );
+                      },
                       child: const Text('New to Huddle? Create account'),
                     ),
                   ],
