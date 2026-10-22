@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'signup_screen.dart';
 
@@ -13,7 +15,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _hidePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -22,15 +26,47 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _signIn() {
-    if (_formKey.currentState!.validate()) {
-      Navigator.of(context).pushReplacement(
+  String _friendlyError(Object error) {
+    final text = error.toString();
+    if (text.startsWith('Exception: ')) {
+      return text.replaceFirst('Exception: ', '');
+    }
+    return 'Cannot reach the server. Is the backend running?';
+  }
+
+  Future<void> _signIn() async {
+    if (_isLoading) return;
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final user = await AuthService.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => HomeScreen(
-            name: _emailController.text.split('@').first,
+            name: user['displayName'] as String,
+            huddleId: user['huddleId'] as String,
           ),
         ),
+        (route) => false,
       );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlyError(e))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -68,16 +104,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autocorrect: false,
                       decoration: const InputDecoration(
                         labelText: 'Email',
                         prefixIcon: Icon(Icons.email_outlined),
                         border: OutlineInputBorder(),
                       ),
                       validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
+                        final email = value?.trim() ?? '';
+                        if (email.isEmpty) {
                           return 'Enter your email';
                         }
-                        if (!value.contains('@')) {
+                        if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                            .hasMatch(email)) {
                           return 'Enter a valid email';
                         }
                         return null;
@@ -87,11 +127,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _hidePassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _signIn(),
                       decoration: InputDecoration(
                         labelText: 'Password',
                         prefixIcon: const Icon(Icons.lock_outline),
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
+                          tooltip:
+                              _hidePassword ? 'Show password' : 'Hide password',
                           icon: Icon(
                             _hidePassword
                                 ? Icons.visibility_off
@@ -106,29 +150,36 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Enter your password';
                         }
-                        if (value.length < 6) {
-                          return 'At least 6 characters';
-                        }
                         return null;
                       },
                     ),
                     const SizedBox(height: 24),
                     FilledButton(
-                      onPressed: _signIn,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        child: Text('Sign in'),
+                      onPressed: _isLoading ? null : _signIn,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Sign in'),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const SignUpScreen(),
-                          ),
-                        );
-                      },
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const SignUpScreen(),
+                                ),
+                              );
+                            },
                       child: const Text('New to Huddle? Create account'),
                     ),
                   ],

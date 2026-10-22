@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
-
+import '../services/auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -28,19 +28,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  void _createAccount() {
-    if (_formKey.currentState!.validate()) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => HomeScreen(
-            name: _nameController.text.trim(),
-            huddleId: _huddleIdController.text.trim(),
-          ),
+  Future<void> _createAccount() async {
+  if (!_formKey.currentState!.validate()) return;
+
+  try {
+    final user = await AuthService.register(
+      huddleId: _huddleIdController.text.trim(),
+      displayName: _nameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
+
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => HomeScreen(
+          name: user['displayName'],
+          huddleId: user['huddleId'],
         ),
-        (route) => false,
-      );
-    }
+      ),
+      (route) => false,
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(e.toString())),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {
